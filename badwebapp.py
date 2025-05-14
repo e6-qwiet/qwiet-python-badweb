@@ -54,13 +54,32 @@ def decode_jwt():
 
 @app.route("/login", methods=["POST"])
 def login():
-    user = request.form.get("username")
-    password = request.form.get("password")
+    user = request.form.get("username", "")
+    password = request.form.get("password", "")
 
     # ⚠️ Hardcoded credential check
     if user == "admin" and password == "password123":
-        return "Welcome, admin!"
-    return "Invalid credentials", 403
+        return f"Welcome, {user}!"  # ✅ Safe for admin
+
+    # ⚠️ Reflected XSS vulnerability: unsanitized username echoed in HTML
+    return f"""
+        <html>
+            <body>
+                <p>Login failed for user: {user}</p>  <!-- ❌ Vulnerable -->
+            </body>
+        </html>
+    """, 403
+
+@app.route("/rce-example", methods=["POST"])
+def rce_example():
+    code = request.form.get("code", "")
+
+    # ⚠️ Remote Code Execution: writing and executing untrusted code
+    with open("temp_exec.py", "w") as f:
+        f.write(code)
+
+    result = subprocess.getoutput("python temp_exec.py")  # ⚠️ Full RCE
+    return f"<pre>{result}</pre>"
 
 if __name__ == "__main__":
     app.run(debug=True)
