@@ -8,6 +8,7 @@ import os
 import subprocess
 import base64
 import jwt  # ⚠️ Potentially insecure if used without verification
+import pickle
 
 app = flask.Flask(__name__)
 
@@ -72,14 +73,36 @@ def login():
 
 @app.route("/rce-example", methods=["POST"])
 def rce_example():
-    code = request.form.get("code", "")
+    user_code = request.form.get("data", "")
 
-    # ⚠️ Remote Code Execution: writing and executing untrusted code
+    # ⚠️ Code injection via unsanitized string interpolation
+    payload = f"""
+def insecure():
+    result = {user_code}
+    return result
+
+output = insecure()
+"""
+
     with open("temp_exec.py", "w") as f:
-        f.write(code)
+        f.write(payload)
 
-    result = subprocess.getoutput("python temp_exec.py")  # ⚠️ Full RCE
+    result = subprocess.getoutput("python temp_exec.py")
     return f"<pre>{result}</pre>"
+
+@app.route("/deserialize", methods=["POST"])
+def deserialize():
+    payload = request.form.get("payload", "")
+
+    try:
+        # ⚠️ Dangerous deserialization of user input
+        data = pickle.loads(bytes.fromhex(payload))
+        return f"Deserialized object: {data}"
+    except Exception as e:
+        return f"Error: {str(e)}", 400
+
+
+
 
 if __name__ == "__main__":
     app.run(debug=True)
